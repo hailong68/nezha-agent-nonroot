@@ -81,7 +81,11 @@ chown $USERNAME:$USERNAME "$AGENT_FILE"
 # 初始化 agent 配置
 echo "[+] 初始化 nezha-agent 配置..."
 if [[ "$TLS" == "true" ]]; then
-  sudo -u "$USERNAME" "$AGENT_FILE" service install --tls --server "$SERVER" --secret "$SECRET"
+  CMD="$AGENT_FILE service install"
+[[ "$TLS" == "true" ]] && CMD+=" --tls"
+CMD+=" --server '$SERVER' --secret '$SECRET'"
+sudo -u "$USERNAME" bash -c "$CMD"
+
 else
   sudo -u "$USERNAME" "$AGENT_FILE" service install --server "$SERVER" --secret "$SECRET"
 fi
