@@ -77,7 +77,7 @@ chown $USERNAME:$USERNAME "$AGENT_FILE"
 
 # 初始化 agent 配置（修复参数问题）
 echo "[+] 初始化 nezha-agent 配置..."
-sudo -u "$USERNAME" bash -c "'$AGENT_FILE' service install --server '$SERVER' --secret '$SECRET' ${TLS:+--tls}"
+sudo -u "$USERNAME" "$AGENT_FILE" service install --server "$SERVER" --secret "$SECRET" ${TLS:+--tls}
 
 # 创建 systemd 服务
 cat > "$SERVICE_FILE" <<EOF
