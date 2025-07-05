@@ -6,6 +6,7 @@ set -e
 ARCH="amd64"
 AGENT_DIR="/opt/nezha"
 AGENT_FILE="$AGENT_DIR/nezha-agent"
+CONFIG_FILE="$AGENT_DIR/config.yaml"
 SERVICE_FILE="/etc/systemd/system/nezha-agent.service"
 USERNAME="nezha"
 
@@ -78,13 +79,14 @@ curl -fsSL "$AGENT_URL" -o "$AGENT_FILE"
 chmod +x "$AGENT_FILE"
 chown $USERNAME:$USERNAME "$AGENT_FILE"
 
-# 初始化 agent 配置
-echo "[+] 初始化 nezha-agent 配置..."
-if [[ "$TLS" == "true" ]]; then
-  sudo -u "$USERNAME" "$AGENT_FILE" service install --server="$SERVER" --secret="$SECRET" --tls
-else
-  sudo -u "$USERNAME" "$AGENT_FILE" service install --server="$SERVER" --secret="$SECRET"
-fi
+# 写入配置文件
+echo "[+] 写入配置文件..."
+cat > "$CONFIG_FILE" <<EOF
+server: "$SERVER"
+secret: "$SECRET"
+tls: $TLS
+EOF
+chown $USERNAME:$USERNAME "$CONFIG_FILE"
 
 # 创建 systemd 服务
 cat > "$SERVICE_FILE" <<EOF
@@ -95,7 +97,7 @@ After=network.target
 [Service]
 Type=simple
 User=$USERNAME
-ExecStart=$AGENT_FILE service run
+ExecStart=$AGENT_FILE -c $CONFIG_FILE
 Restart=always
 RestartSec=5s
 
