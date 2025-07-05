@@ -76,10 +76,11 @@ chmod +x "$AGENT_FILE"
 chown $USERNAME:$USERNAME "$AGENT_FILE"
 
 # 初始化 agent 配置
-sudo -u $USERNAME $AGENT_FILE service install \
-  --server $SERVER \
-  --secret $SECRET \
-  ${TLS:+--tls}
+INSTALL_CMD=("$AGENT_FILE" service install --server "$SERVER" --secret "$SECRET")
+if [[ "$TLS" == "true" ]]; then
+  INSTALL_CMD+=("--tls")
+fi
+sudo -u "$USERNAME" "${INSTALL_CMD[@]}"
 
 # 创建 systemd 服务
 cat > "$SERVICE_FILE" <<EOF
