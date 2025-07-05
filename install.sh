@@ -2,71 +2,84 @@
 
 set -e
 
-# 默认参数
-ARCH="amd64"
-AGENT_VERSION="nezha-agent_linux_amd64"
-GITHUB_REPO="hailong68/nezha-agent-nonroot"
-INSTALL_DIR="/opt/nezha"
-AGENT_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/main/bin/${AGENT_VERSION}"
+# ============================
+# Nezha Agent Non-Root Install Script (only for amd64)
+# ============================
 
-# 解析参数
-for arg in "$@"; do
-  case $arg in
+ARCH=$(uname -m)
+if [[ "$ARCH" != "x86_64" ]]; then
+  echo "❌ 当前架构为 $ARCH，仅支持 amd64 (x86_64) 架构安装"
+  exit 1
+fi
+
+# 检查参数
+while [[ $# -gt 0 ]]; do
+  case $1 in
     --server=*)
-      SERVER="${arg#*=}"
+      SERVER="${1#*=}"
+      shift
       ;;
     --secret=*)
-      SECRET="${arg#*=}"
+      SECRET="${1#*=}"
+      shift
       ;;
     --tls)
-      TLS="true"
+      TLS=true
+      shift
       ;;
     *)
+      echo "❌ 未知参数: $1"
+      exit 1
       ;;
   esac
 done
 
-# 参数校验
 if [[ -z "$SERVER" || -z "$SECRET" ]]; then
   echo "❌ 缺少参数 --server 或 --secret"
-  echo "✅ 示例: bash install.sh --server=xxx.com:443 --secret=xxx --tls"
+  echo "✅ 示例: bash install.sh --server=example.com:443 --secret=YOUR_SECRET --tls"
   exit 1
 fi
 
-# 创建运行用户
-echo "[+] 创建系统用户 nezha..."
-id -u nezha &>/dev/null || useradd -r -M -s /sbin/nologin nezha
+# 默认开启 TLS
+TLS=${TLS:-true}
 
-# 创建安装目录
-mkdir -p "$INSTALL_DIR"
+# 设置变量
+AGENT_DIR="$HOME/.nezha-agent"
+AGENT_BIN="$AGENT_DIR/nezha-agent"
+AGENT_URL="https://raw.githubusercontent.com/hailong68/nezha-agent-nonroot/main/bin/nezha-agent_linux_amd64"
 
-# 下载 agent
-echo "[+] 下载 nezha-agent (amd64)..."
-curl -sSL "$AGENT_URL" -o "${INSTALL_DIR}/nezha-agent"
-chmod +x "${INSTALL_DIR}/nezha-agent"
-chown -R nezha:nezha "$INSTALL_DIR"
+mkdir -p "$AGENT_DIR"
+echo "[+] 下载 nezha-agent 到 $AGENT_BIN..."
+curl -fsSL "$AGENT_URL" -o "$AGENT_BIN"
+chmod +x "$AGENT_BIN"
 
-# 创建 Systemd 服务文件
-cat <<EOF >/etc/systemd/system/nezha-agent.service
+# 配置 systemd 用户服务
+SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+mkdir -p "$SYSTEMD_USER_DIR"
+
+cat > "$SYSTEMD_USER_DIR/nezha-agent.service" <<EOF
 [Unit]
 Description=Nezha Monitoring Agent (Non-root)
 After=network.target
 
 [Service]
-User=nezha
-ExecStart=${INSTALL_DIR}/nezha-agent -s ${SERVER} -p ${SECRET} --tls
+ExecStart=$AGENT_BIN service run --server $SERVER --secret $SECRET --tls
 Restart=always
 RestartSec=5s
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 EOF
 
-# 重新加载并启动
-systemctl daemon-reexec
-systemctl daemon-reload
-systemctl enable --now nezha-agent
+# 启用 systemd 用户服务
+echo "[+] 启用并启动 systemd 用户服务..."
+systemctl --user daemon-reexec || true
+systemctl --user daemon-reload
+systemctl --user enable --now nezha-agent
 
-echo "✅ 安装完成！可使用以下命令查看状态："
-echo "   systemctl status nezha-agent"
-echo "   journalctl -u nezha-agent -f"
+# 提示
+echo "✅ 安装完成！使用以下命令查看状态："
+echo "   systemctl --user status nezha-agent"
+echo "   journalctl --user -u nezha-agent -f"
+echo "📌 如需开机自启，请确保登录用户已启用 lingering："
+echo "   sudo loginctl enable-linger \$USER"
