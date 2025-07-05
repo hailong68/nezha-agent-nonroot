@@ -83,7 +83,7 @@ chown $USERNAME:$USERNAME "$AGENT_FILE"
 echo "[+] 写入配置文件..."
 cat > "$CONFIG_FILE" <<EOF
 server: "$SERVER"
-secret: "$SECRET"
+client_secret: "$SECRET"
 tls: $TLS
 EOF
 chown $USERNAME:$USERNAME "$CONFIG_FILE"
