@@ -99,4 +99,4 @@ systemctl enable --now nezha-agent
 
 echo "✅ 安装完成！可使用以下命令查看状态："
 echo "   systemctl status nezha-agent"
-echo "   journalctl
+echo "   journalctl -u nezha-agent -f"
