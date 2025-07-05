@@ -2,33 +2,56 @@
 
 set -e
 
-# ============================
-# Nezha Agent Non-Root Install Script (only for amd64)
-# ============================
+# 默认参数
+ARCH="amd64"
+AGENT_DIR="/opt/nezha"
+AGENT_FILE="$AGENT_DIR/nezha-agent"
+SERVICE_FILE="/etc/systemd/system/nezha-agent.service"
+USERNAME="nezha"
 
-ARCH=$(uname -m)
-if [[ "$ARCH" != "x86_64" ]]; then
-  echo "❌ 当前架构为 $ARCH，仅支持 amd64 (x86_64) 架构安装"
-  exit 1
+# GitHub 地址（使用你自己的仓库）
+REPO="hailong68/nezha-agent-nonroot"
+AGENT_URL="https://raw.githubusercontent.com/$REPO/main/bin/nezha-agent_linux_amd64"
+
+print_help() {
+  echo "用法: bash install.sh --server <服务器地址:端口> --secret <密钥> [--tls]"
+  echo "     卸载: bash install.sh --uninstall"
+}
+
+if [[ "$1" == "--uninstall" ]]; then
+  echo "[+] 正在卸载 nezha-agent..."
+  systemctl stop nezha-agent 2>/dev/null || true
+  systemctl disable nezha-agent 2>/dev/null || true
+  rm -f "$SERVICE_FILE"
+  rm -rf "$AGENT_DIR"
+  id -u $USERNAME &>/dev/null && userdel -r $USERNAME 2>/dev/null || true
+  echo "✅ 卸载完成"
+  exit 0
 fi
 
-# 检查参数
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --server=*)
-      SERVER="${1#*=}"
-      shift
+# 检查依赖
+command -v curl >/dev/null 2>&1 || { echo >&2 "❌ 未安装 curl"; exit 1; }
+command -v systemctl >/dev/null 2>&1 || { echo >&2 "❌ 未安装 systemd"; exit 1; }
+
+# 解析参数
+TLS="false"
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --server)
+      SERVER="$2"
+      shift 2
       ;;
-    --secret=*)
-      SECRET="${1#*=}"
-      shift
+    --secret)
+      SECRET="$2"
+      shift 2
       ;;
     --tls)
-      TLS=true
+      TLS="true"
       shift
       ;;
     *)
       echo "❌ 未知参数: $1"
+      print_help
       exit 1
       ;;
   esac
@@ -36,50 +59,44 @@ done
 
 if [[ -z "$SERVER" || -z "$SECRET" ]]; then
   echo "❌ 缺少参数 --server 或 --secret"
-  echo "✅ 示例: bash install.sh --server=example.com:443 --secret=YOUR_SECRET --tls"
+  print_help
   exit 1
 fi
 
-# 默认开启 TLS
-TLS=${TLS:-true}
-
-# 设置变量
-AGENT_DIR="$HOME/.nezha-agent"
-AGENT_BIN="$AGENT_DIR/nezha-agent"
-AGENT_URL="https://raw.githubusercontent.com/hailong68/nezha-agent-nonroot/main/bin/nezha-agent_linux_amd64"
-
+# 创建用户和目录
+echo "[+] 创建系统用户 $USERNAME..."
+id -u $USERNAME &>/dev/null || useradd -r -s /bin/false -d $AGENT_DIR $USERNAME
 mkdir -p "$AGENT_DIR"
-echo "[+] 下载 nezha-agent 到 $AGENT_BIN..."
-curl -fsSL "$AGENT_URL" -o "$AGENT_BIN"
-chmod +x "$AGENT_BIN"
+chown $USERNAME:$USERNAME "$AGENT_DIR"
 
-# 配置 systemd 用户服务
-SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
-mkdir -p "$SYSTEMD_USER_DIR"
+# 下载 agent
+echo "[+] 下载 nezha-agent ($ARCH)..."
+curl -fsSL "$AGENT_URL" -o "$AGENT_FILE"
+chmod +x "$AGENT_FILE"
+chown $USERNAME:$USERNAME "$AGENT_FILE"
 
-cat > "$SYSTEMD_USER_DIR/nezha-agent.service" <<EOF
+# 创建 systemd 服务
+cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=Nezha Monitoring Agent (Non-root)
 After=network.target
 
 [Service]
-ExecStart=$AGENT_BIN service run --server $SERVER --secret $SECRET --tls
+Type=simple
+User=$USERNAME
+ExecStart=$AGENT_FILE -s $SERVER -p $SECRET ${TLS:+--tls}
 Restart=always
 RestartSec=5s
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 EOF
 
-# 启用 systemd 用户服务
-echo "[+] 启用并启动 systemd 用户服务..."
-systemctl --user daemon-reexec || true
-systemctl --user daemon-reload
-systemctl --user enable --now nezha-agent
+# 重新加载并启动服务
+systemctl daemon-reexec
+systemctl daemon-reload
+systemctl enable --now nezha-agent
 
-# 提示
-echo "✅ 安装完成！使用以下命令查看状态："
-echo "   systemctl --user status nezha-agent"
-echo "   journalctl --user -u nezha-agent -f"
-echo "📌 如需开机自启，请确保登录用户已启用 lingering："
-echo "   sudo loginctl enable-linger \$USER"
+echo "✅ 安装完成！可使用以下命令查看状态："
+echo "   systemctl status nezha-agent"
+echo "   journalctl
