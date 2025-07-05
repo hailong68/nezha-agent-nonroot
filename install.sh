@@ -75,6 +75,12 @@ curl -fsSL "$AGENT_URL" -o "$AGENT_FILE"
 chmod +x "$AGENT_FILE"
 chown $USERNAME:$USERNAME "$AGENT_FILE"
 
+# 初始化 agent 配置
+sudo -u $USERNAME $AGENT_FILE service install \
+  --server $SERVER \
+  --secret $SECRET \
+  ${TLS:+--tls}
+
 # 创建 systemd 服务
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
@@ -84,7 +90,7 @@ After=network.target
 [Service]
 Type=simple
 User=$USERNAME
-ExecStart=$AGENT_FILE -s $SERVER -p $SECRET ${TLS:+--tls}
+ExecStart=$AGENT_FILE service run
 Restart=always
 RestartSec=5s
 
