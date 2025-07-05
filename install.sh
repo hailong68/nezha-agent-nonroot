@@ -82,7 +82,7 @@ chown $USERNAME:$USERNAME "$AGENT_FILE"
 echo "[+] 初始化 nezha-agent 配置..."
 CMD="$AGENT_FILE service install"
 [[ "$TLS" == "true" ]] && CMD+=" --tls"
-CMD+=" --server $SERVER --secret $SECRET"
+CMD+=" --server '$SERVER' --secret '$SECRET'"
 sudo -u "$USERNAME" bash -c "$CMD"
 
 # 创建 systemd 服务
