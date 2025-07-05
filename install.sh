@@ -35,7 +35,10 @@ command -v systemctl >/dev/null 2>&1 || { echo >&2 "❌ 未安装 systemd"; exit
 
 # 解析参数
 TLS="false"
-while [[ "$#" -gt 0 ]]; do
+SERVER=""
+SECRET=""
+
+while [[ $# -gt 0 ]]; do
   case "$1" in
     --server)
       SERVER="$2"
@@ -75,9 +78,13 @@ curl -fsSL "$AGENT_URL" -o "$AGENT_FILE"
 chmod +x "$AGENT_FILE"
 chown $USERNAME:$USERNAME "$AGENT_FILE"
 
-# 初始化 agent 配置（修复参数问题）
+# 初始化 agent 配置
 echo "[+] 初始化 nezha-agent 配置..."
-sudo -u "$USERNAME" "$AGENT_FILE" service install --server "$SERVER" --secret "$SECRET" ${TLS:+--tls}
+if [[ "$TLS" == "true" ]]; then
+  sudo -u "$USERNAME" "$AGENT_FILE" service install --tls --server "$SERVER" --secret "$SECRET"
+else
+  sudo -u "$USERNAME" "$AGENT_FILE" service install --server "$SERVER" --secret "$SECRET"
+fi
 
 # 创建 systemd 服务
 cat > "$SERVICE_FILE" <<EOF
