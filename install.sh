@@ -80,15 +80,10 @@ chown $USERNAME:$USERNAME "$AGENT_FILE"
 
 # 初始化 agent 配置
 echo "[+] 初始化 nezha-agent 配置..."
-if [[ "$TLS" == "true" ]]; then
-  CMD="$AGENT_FILE service install"
+CMD="$AGENT_FILE service install"
 [[ "$TLS" == "true" ]] && CMD+=" --tls"
 CMD+=" --server '$SERVER' --secret '$SECRET'"
 sudo -u "$USERNAME" bash -c "$CMD"
-
-else
-  sudo -u "$USERNAME" "$AGENT_FILE" service install --server "$SERVER" --secret "$SECRET"
-fi
 
 # 创建 systemd 服务
 cat > "$SERVICE_FILE" <<EOF
