@@ -9,6 +9,8 @@ AGENT_FILE="$AGENT_DIR/nezha-agent"
 CONFIG_FILE="$AGENT_DIR/config.yaml"
 SERVICE_FILE="/etc/systemd/system/nezha-agent.service"
 USERNAME="nezha"
+LOG_CLEANUP_TIMER="/etc/systemd/system/nezha-agent-log-cleanup.timer"
+LOG_CLEANUP_SERVICE="/etc/systemd/system/nezha-agent-log-cleanup.service"
 
 # GitHub 地址（使用你自己的仓库）
 REPO="hailong68/nezha-agent-nonroot"
@@ -23,8 +25,11 @@ if [[ "$1" == "--uninstall" ]]; then
   echo "[+] 正在卸载 nezha-agent..."
   systemctl stop nezha-agent 2>/dev/null || true
   systemctl disable nezha-agent 2>/dev/null || true
-  rm -f "$SERVICE_FILE"
+  systemctl stop nezha-agent-log-cleanup.timer 2>/dev/null || true
+  systemctl disable nezha-agent-log-cleanup.timer 2>/dev/null || true
+  rm -f "$SERVICE_FILE" "$LOG_CLEANUP_SERVICE" "$LOG_CLEANUP_TIMER"
   rm -rf "$AGENT_DIR"
+  systemctl daemon-reload
   id -u $USERNAME &>/dev/null && userdel -r $USERNAME 2>/dev/null || true
   echo "✅ 卸载完成"
   exit 0
@@ -120,11 +125,35 @@ RestartSec=5s
 WantedBy=multi-user.target
 EOF
 
-# 重新加载并启动服务
+# 创建日志清理服务和定时器（仅清理 nezha-agent 日志）
+cat > "$LOG_CLEANUP_SERVICE" <<EOF
+[Unit]
+Description=Clean Nezha Agent Logs
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '/bin/journalctl -u nezha-agent --vacuum-time=7d'
+EOF
+
+cat > "$LOG_CLEANUP_TIMER" <<EOF
+[Unit]
+Description=Weekly Cleanup of Nezha Agent Logs
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+# 启动服务和定时器
 systemctl daemon-reexec
 systemctl daemon-reload
 systemctl enable --now nezha-agent
+systemctl enable --now nezha-agent-log-cleanup.timer
 
 echo "✅ 安装完成！可使用以下命令查看状态："
 echo "   systemctl status nezha-agent"
 echo "   journalctl -u nezha-agent -f"
+echo "   systemctl list-timers --all | grep nezha"
