@@ -82,13 +82,24 @@ chown $USERNAME:$USERNAME "$AGENT_FILE"
 # 写入配置文件
 echo "[+] 写入配置文件..."
 cat > "$CONFIG_FILE" <<EOF
-server: "$SERVER"
-client_secret: "$SECRET"
+server: $SERVER
+client_secret: $SECRET
 tls: $TLS
 disable_auto_update: true
 disable_command_execute: true
+disable_force_update: true
+disable_nat: false
+disable_send_query: false
+gpu: false
+insecure_tls: false
+ip_report_period: 1800
+report_delay: 3
+self_update_period: 0
 skip_connection_count: true
 skip_procs_count: true
+temperature: false
+use_gitee_to_upgrade: false
+use_ipv6_country_code: false
 EOF
 chown $USERNAME:$USERNAME "$CONFIG_FILE"
 
