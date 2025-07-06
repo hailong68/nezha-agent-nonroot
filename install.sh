@@ -85,6 +85,10 @@ cat > "$CONFIG_FILE" <<EOF
 server: "$SERVER"
 client_secret: "$SECRET"
 tls: $TLS
+disable_auto_update: true
+disable_command_execute: true
+skip_connection_count: true
+skip_procs_count: true
 EOF
 chown $USERNAME:$USERNAME "$CONFIG_FILE"
 
